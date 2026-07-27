@@ -1,0 +1,32 @@
+controller:
+  replicaCount: 2
+
+  ingressClass: nginx
+
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: false
+    controllerValue: k8s.io/ingress-nginx
+
+  watchIngressWithoutClass: false
+
+
+  service:
+    type: LoadBalancer
+
+    # Preserve the original client IP and avoid an unnecessary network hop.
+    externalTrafficPolicy: Local
+
+    annotations:
+      # Create an AWS Network Load Balancer instead of a Classic Load Balancer.
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+      # Make the load balancer publicly reachable.
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+
+      # Distribute connections across the enabled Availability Zones.
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+  admissionWebhooks:
+    enabled: true

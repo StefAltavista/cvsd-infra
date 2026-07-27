@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+
+
 set -euo pipefail
 
 # Usage: ./scripts/up.sh <your-name>
