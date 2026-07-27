@@ -141,7 +141,12 @@ module "eks" {
     }
   }
 
-  tags = local.common_tags
+  tags = merge(
+    local.common_tags,
+    {
+      GuardDutyManaged = "false"
+    }
+  )
 
   depends_on = [
     aws_iam_role_policy_attachment.ebs_csi
