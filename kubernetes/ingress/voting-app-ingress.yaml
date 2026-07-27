@@ -11,7 +11,7 @@ spec:
   ingressClassName: nginx
 
   rules:
-    - host: vote.example.com
+    - host: vote.stef.ironlabs.online
       http:
         paths:
           - path: /
@@ -22,7 +22,7 @@ spec:
                 port:
                   number: 80
 
-    - host: result.example.com
+    - host: result.stef.ironlabs.online
       http:
         paths:
           - path: /

@@ -1,0 +1,7 @@
+region           = "us-east-1"
+hosted_zone_name = "ironlabs.online"
+student_name     = "stef"
+
+# Obtain both values after ingress-nginx creates its AWS load balancer.
+ingress_hostname = "replace-with-ingress-nlb.elb.us-east-1.amazonaws.com"
+ingress_zone_id  = "ZREPLACEWITHNLBZONEID"

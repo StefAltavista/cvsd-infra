@@ -38,15 +38,3 @@ variable "max_nodes" {
   default     = 4
 }
 
-
-# Route 53 variables
-
-variable "domain_name" {
-  description = "Public domain used by the voting application."
-  type        = string
-}
-
-variable "ingress_hostname" {
-  description = "AWS load balancer hostname created for ingress-nginx."
-  type        = string
-}
