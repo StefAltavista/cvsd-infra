@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  namespace: voting-app
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: voting-app
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: voting-app
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: voting-app
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: voting-app
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: voting-app
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP

@@ -3,6 +3,9 @@ kind: ConfigMap
 metadata:
   name: voting-app-config
   namespace: voting-app
+  labels:
+    app.kubernetes.io/name: voting-app-config
+    app.kubernetes.io/part-of: voting-app
 data:
   REDIS_HOST: "redis-service"
   REDIS_PORT: "6379"

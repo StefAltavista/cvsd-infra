@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: result-service
+  namespace: voting-app
+  labels:
+    app.kubernetes.io/name: result
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: voting-app
+spec:
+  type: ClusterIP
+
+  # The result application uses Socket.IO. Keeping requests from a client
+  # on the same backend is useful when multiple replicas are running.
+  sessionAffinity: ClientIP
+
+  selector:
+    app.kubernetes.io/name: result
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: voting-app
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

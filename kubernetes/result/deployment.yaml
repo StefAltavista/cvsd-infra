@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: result
+  namespace: voting-app
+  labels:
+    app.kubernetes.io/name: result
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: voting-app
+spec:
+  replicas: 2
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: result
+      app.kubernetes.io/component: frontend
+      app.kubernetes.io/part-of: voting-app
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: result
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: voting-app
+
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: result
+              app.kubernetes.io/component: frontend
+              app.kubernetes.io/part-of: voting-app
+
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until pg_isready -h postgres-service -p 5432; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready."
+
+      containers:
+        - name: result
+          image: stefltv/results-node-service:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          env:
+            - name: NODE_ENV
+              value: production
+
+            - name: PORT
+              value: "80"
+
+            - name: PG_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: voting-app-config
+                  key: POSTGRES_HOST
+
+            - name: PG_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: voting-app-config
+                  key: POSTGRES_PORT
+
+            - name: PG_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: voting-app-config
+                  key: POSTGRES_DB
+
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: voting-app-secrets
+                  key: POSTGRES_USER
+
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: voting-app-secrets
+                  key: POSTGRES_PASSWORD
+
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
