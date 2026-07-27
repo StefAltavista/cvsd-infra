@@ -1,10 +1,52 @@
 locals {
   cluster_name = "eks-${var.student_name}"
+
+  common_tags = {
+    Project   = "voting-app"
+    Student   = var.student_name
+    ManagedBy = "Terraform"
+  }
 }
 
-# --- Network ---
-# Note: every student's VPC uses the same CIDR (10.0.0.0/16). That's fine —
-# separate VPCs are fully isolated, so identical ranges never conflict.
+# -------------------------------------------------------------------
+# EBS CSI Pod Identity
+# -------------------------------------------------------------------
+
+# EKS Pod Identity assumes this IAM role on behalf of the
+# ebs-csi-controller-sa Kubernetes service account.
+data "aws_iam_policy_document" "ebs_csi_pod_identity" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "sts:AssumeRole",
+      "sts:TagSession",
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ebs_csi" {
+  name               = "${local.cluster_name}-ebs-csi"
+  assume_role_policy = data.aws_iam_policy_document.ebs_csi_pod_identity.json
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  role = aws_iam_role.ebs_csi.name
+
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicyV2"
+}
+
+# -------------------------------------------------------------------
+# Network
+# -------------------------------------------------------------------
+
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
@@ -17,34 +59,91 @@ module "vpc" {
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
 
   enable_nat_gateway   = true
-  single_nat_gateway   = true   # ONE NAT gateway, not one per AZ (each costs ~$32/mo)
+  single_nat_gateway   = true
   enable_dns_hostnames = true
 
-  # Tags that let EKS find subnets for load balancers
-  public_subnet_tags  = { "kubernetes.io/role/elb" = "1" }
-  private_subnet_tags = { "kubernetes.io/role/internal-elb" = "1" }
+  # Public subnets are used by public load balancers,
+  # including the ingress-nginx LoadBalancer service.
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+  }
+
+  # Private subnets are available for internal load balancers.
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = "1"
+  }
+
+  tags = local.common_tags
 }
 
-# --- EKS cluster + worker nodes ---
+# -------------------------------------------------------------------
+# EKS cluster and worker nodes
+# -------------------------------------------------------------------
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  version = "20.31.6"
 
   cluster_name    = local.cluster_name
   cluster_version = var.k8s_version
 
   cluster_endpoint_public_access           = true
-  enable_cluster_creator_admin_permissions = true   # you get kubectl admin automatically
+  enable_cluster_creator_admin_permissions = true
+
+  # We use EKS Pod Identity instead of IRSA for the EBS CSI driver.
+  enable_irsa = false
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
+  cluster_addons = {
+    # Required for normal Pod networking.
+    vpc-cni = {
+      most_recent    = true
+      before_compute = true
+    }
+
+    kube-proxy = {
+      most_recent = true
+    }
+
+    coredns = {
+      most_recent = true
+    }
+
+    # Runs the Pod Identity agent on each worker node.
+    eks-pod-identity-agent = {
+      most_recent    = true
+      before_compute = true
+    }
+
+    # Dynamically provisions EBS volumes for Kubernetes PVCs.
+    aws-ebs-csi-driver = {
+      most_recent = true
+
+      pod_identity_association = [
+        {
+          role_arn        = aws_iam_role.ebs_csi.arn
+          service_account = "ebs-csi-controller-sa"
+        }
+      ]
+    }
+  }
+
   eks_managed_node_groups = {
     default = {
       instance_types = ["t3.medium"]
-      min_size       = var.min_nodes
-      max_size       = var.max_nodes
-      desired_size   = var.desired_nodes
+      ami_type       = "AL2023_x86_64_STANDARD"
+
+      min_size     = var.min_nodes
+      max_size     = var.max_nodes
+      desired_size = var.desired_nodes
     }
   }
+
+  tags = local.common_tags
+
+  depends_on = [
+    aws_iam_role_policy_attachment.ebs_csi
+  ]
 }
