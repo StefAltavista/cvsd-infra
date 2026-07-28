@@ -129,7 +129,18 @@ module "eks" {
       ]
     }
   }
-
+  # Allow Pods and system components on different worker nodes
+  # to communicate on all ports and protocols.
+  node_security_group_additional_rules = {
+    ingress_self_all = {
+      description = "Node to node all ports and protocols"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
+      type        = "ingress"
+      self        = true
+    }
+  }
   eks_managed_node_groups = {
     default = {
       instance_types = ["t3.medium"]
