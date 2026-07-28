@@ -35,10 +35,6 @@ helm upgrade --install ingress-nginx \
   --wait \
   --timeout 10m
 
-echo ">> Applying application routing..."
-kubectl apply \
-  -f "$REPO_DIR/kubernetes/ingress/voting-app-ingress.yaml"
-
 echo ">> Waiting for AWS load balancer..."
 
 until INGRESS_HOST="$(
@@ -50,5 +46,5 @@ until INGRESS_HOST="$(
   sleep 5
 done
 
-echo ">> Ingress ready:"
+echo ">> Ingress controller ready:"
 echo "   ${INGRESS_HOST}"
