@@ -1,0 +1,51 @@
+name: Deploy application services
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-application-services
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy vote, result and worker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Configure kubectl for EKS
+        run: |
+          set -euo pipefail
+
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER_NAME }}" \
+            --region "${{ vars.AWS_REGION }}"
+
+      - name: Verify cluster connection
+        run: |
+          set -euo pipefail
+
+          kubectl cluster-info
+          kubectl get namespace voting-app
+
+      - name: Deploy application services
+        run: |
+          set -euo pipefail
+
+          bash ./scripts/workflow-deploy-services.sh
